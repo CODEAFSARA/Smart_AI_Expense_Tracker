@@ -1,0 +1,35 @@
+# Python cache and virtual env
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+.venv/
+venv/
+env/
+pip-wheel-metadata/
+*.egg-info/
+dist/
+build/
+
+# Lambda deployment zips
+*.zip
+
+# AWS CLI / CloudFormation packaging artifacts
+.aws-sam/
+.cdk.out/
+*.template.json
+
+# IDE / Editor files
+.vscode/
+.idea/
+*.log
+*.tmp
+*.swp
+
+# Qodo or auto-generated project metadata
+.qodo/
+
+# System files
+.DS_Store
+Thumbs.db

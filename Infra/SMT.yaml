@@ -1,0 +1,322 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Serverless Smart Expense Tracker using AWS Lambda, API Gateway, DynamoDB, and CloudWatch
+
+Parameters:
+  DeploymentS3Bucket:
+    Type: String
+    Description: "S3 bucket name where Lambda deployment packages will be uploaded (created separately)"
+  AllowedEmailForAlerts:
+    Type: String
+    Description: "Email that will be subscribed to SNS alarms"
+  LambdaRuntime:
+    Type: String
+    Default: python3.11
+
+Resources:
+  ExpenseTrackerLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${AWS::StackName}-LambdaRole"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: 
+                - lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: ExpenseTrackerLambdaPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                  - dynamodb:GetItem
+                  - dynamodb:Query
+                  - dynamodb:Scan
+                  - dynamodb:DeleteItem
+                Resource: !GetAtt ExpenseTrackerTable.Arn
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:DeleteObject
+                # Resource: !Sub "${RecipientsBucket.Arn}/*"
+                Resource: !Sub "arn:aws:s3:::${RecipientsBucket}/*"
+
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: "*"
+
+  ExpenseTrackerTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions: 
+        - AttributeName: UserId
+          AttributeType: S
+        - AttributeName: ExpenseDate
+          AttributeType: S
+      KeySchema: 
+        - AttributeName: UserId
+          KeyType: HASH
+        - AttributeName: ExpenseDate
+          KeyType: RANGE
+      SSESpecification:
+        SSEEnabled: true
+      TableName: ExpenseTrackerTable
+      BillingMode: PAY_PER_REQUEST
+      Tags:
+        - Key: Project
+          Value: SmartExpenseTracker
+        - Key: Environment
+          Value: dev
+    # DeletionPolicy: Retain
+
+  RecipientsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${AWS::StackName}-receipts-${AWS::Region}-${AWS::AccountId}"
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+    # DeletionPolicy: Retain
+
+  AddExpenseFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${AWS::StackName}-AddExpense"
+      Runtime: !Ref LambdaRuntime
+      Handler: app.handler
+      Role: !GetAtt ExpenseTrackerLambdaRole.Arn
+      Code:
+        S3Bucket: !Ref DeploymentS3Bucket
+        S3Key: add_expense.zip
+      Timeout: 10
+      MemorySize: 256
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref ExpenseTrackerTable
+          BUCKET_NAME: !Ref RecipientsBucket
+
+  GetExpensesFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${AWS::StackName}-GetExpenses"
+      Runtime: !Ref LambdaRuntime
+      Handler: app.handler
+      Role: !GetAtt ExpenseTrackerLambdaRole.Arn
+      Code:
+        S3Bucket: !Ref DeploymentS3Bucket
+        S3Key: get_expense.zip
+      Timeout: 10
+      MemorySize: 256
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref ExpenseTrackerTable
+
+  DeleteExpenseFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${AWS::StackName}-DeleteExpense"
+      Runtime: !Ref LambdaRuntime
+      Handler: app.handler
+      Role: !GetAtt ExpenseTrackerLambdaRole.Arn
+      Code:
+        S3Bucket: !Ref DeploymentS3Bucket
+        S3Key: delete_expense.zip
+      Timeout: 10
+      MemorySize: 256
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref ExpenseTrackerTable
+
+  PresignUploadFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${AWS::StackName}-PresignUpload"
+      Runtime: !Ref LambdaRuntime
+      Handler: app.handler
+      Role: !GetAtt ExpenseTrackerLambdaRole.Arn
+      Code:
+        S3Bucket: !Ref DeploymentS3Bucket
+        S3Key: predesign_upload.zip
+      Timeout: 10
+      MemorySize: 256
+      Environment:
+        Variables:
+          BUCKET_NAME: !Ref RecipientsBucket
+
+  ApiGatewayRestApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: !Sub "${AWS::StackName}-api"
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+
+  ApiResourceExpenses:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ParentId: !GetAtt ApiGatewayRestApi.RootResourceId
+      PathPart: expenses
+
+  ApiMethodPostAdd:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ResourceId: !Ref ApiResourceExpenses
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub
+          - arn:aws:apigateway:${Region}:lambda:path/2015-03-31/functions/${LambdaArn}/invocations
+          - { Region: !Ref "AWS::Region", LambdaArn: !GetAtt AddExpenseFunction.Arn }
+
+  ApiMethodGet:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ResourceId: !Ref ApiResourceExpenses
+      HttpMethod: GET
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub
+          - arn:aws:apigateway:${Region}:lambda:path/2015-03-31/functions/${LambdaArn}/invocations
+          - { Region: !Ref "AWS::Region", LambdaArn: !GetAtt GetExpensesFunction.Arn }
+
+  ApiResourceExpenseId:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ParentId: !Ref ApiResourceExpenses
+      PathPart: "{expenseId}"
+
+  ApiMethodDelete:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ResourceId: !Ref ApiResourceExpenseId
+      HttpMethod: DELETE
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub
+          - arn:aws:apigateway:${Region}:lambda:path/2015-03-31/functions/${LambdaArn}/invocations
+          - { Region: !Ref "AWS::Region", LambdaArn: !GetAtt DeleteExpenseFunction.Arn }
+
+  ApiResourcePresign:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ParentId: !GetAtt ApiGatewayRestApi.RootResourceId
+      PathPart: presign
+
+  ApiMethodPresignPost:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ResourceId: !Ref ApiResourcePresign
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub
+          - arn:aws:apigateway:${Region}:lambda:path/2015-03-31/functions/${LambdaArn}/invocations
+          - { Region: !Ref "AWS::Region", LambdaArn: !GetAtt PresignUploadFunction.Arn }
+
+  ApiDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - ApiMethodPostAdd
+      - ApiMethodGet
+      - ApiMethodDelete
+      - ApiMethodPresignPost
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      StageName: prod
+
+  PermissionForApiToInvokeAddLambda:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt AddExpenseFunction.Arn
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/*/expenses"
+
+  PermissionForApiToInvokeGetLambda:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt GetExpensesFunction.Arn
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/*/expenses"
+
+  PermissionForApiToInvokeDeleteLambda:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt DeleteExpenseFunction.Arn
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/*/expenses/*"
+
+  PermissionForApiToInvokePresignLambda:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt PresignUploadFunction.Arn
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/*/presign"
+
+  AlarmTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub "${AWS::StackName}-alarms-topic"
+
+  AlarmTopicSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref AlarmTopic
+      Protocol: email
+      Endpoint: !Ref AllowedEmailForAlerts
+
+  LambdaErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: "Alarm if Lambda error rate > 1 in 5 minutes"
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref AddExpenseFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanThreshold
+      AlarmActions:
+        - !Ref AlarmTopic
+
+Outputs:
+  ApiEndpoint:
+    Description: "API Gateway invoke URL (prod stage)"
+    Value: !Sub "https://${ApiGatewayRestApi}.execute-api.${AWS::Region}.amazonaws.com/prod"
+  TableName:
+    Description: "DynamoDB table name"
+    Value: !Ref ExpenseTrackerTable
+  ReceiptsBucketName:
+    Description: "S3 bucket name for receipts"
+    Value: !Ref RecipientsBucket

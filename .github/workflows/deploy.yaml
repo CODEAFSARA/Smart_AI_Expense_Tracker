@@ -1,0 +1,136 @@
+name: 🚀 Deploy Smart Expense Tracker to AWS
+
+on:
+  push:
+    branches: [ "main" ]     # Deploy automatically when code is pushed to main
+  workflow_dispatch:          # Allow manual trigger from GitHub UI
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      # Step 1: Checkout code
+      - name: 🧩 Checkout repository
+        uses: actions/checkout@v4
+
+      # Step 2: Set up Python
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # Step 3: Install AWS CLI
+      - name: ⚙️ Install AWS CLI
+        run: |
+          pip install awscli
+
+      # Step 4: Package all Lambda functions
+      - name: 📦 Package Lambda functions
+        run: |
+          mkdir -p build
+          for dir in lambda/*; do
+            func_name=$(basename $dir)
+            echo "📁 Packaging function: $func_name"
+            cd $dir
+            pip install -r requirements.txt -t . --quiet
+            zip -r ../../build/${func_name}.zip . > /dev/null
+            cd ../..
+          done
+          echo "✅ All Lambda functions packaged into build/ folder"
+
+      # Step 5: Configure AWS credentials
+      - name: 🔐 Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.ACCESS_KEY }}
+          aws-secret-access-key: ${{ secrets.SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      # Step 6: (Optional) Create deployment bucket if not exists
+      # This static bucket is used to store lambda zips for CloudFormation packaging
+      - name: ☁️ Ensure deployment bucket exists
+        run: |
+          DEPLOY_BUCKET="smart-expense-deployments-${{ secrets.AWS_REGION }}-${{ secrets.AWS_ACCOUNT_ID }}"
+          echo "🪣 Checking if deployment bucket exists: $DEPLOY_BUCKET"
+          if ! aws s3 ls "s3://$DEPLOY_BUCKET" 2>/dev/null; then
+            echo "Bucket not found. Creating..."
+            aws s3 mb "s3://$DEPLOY_BUCKET"
+          fi
+          echo "✅ Deployment bucket ready: $DEPLOY_BUCKET"
+          echo "DEPLOY_BUCKET=$DEPLOY_BUCKET" >> $GITHUB_ENV
+#
+      # Step 7: Upload build artifacts to S3
+      - name: ☁️ Upload Lambda packages to S3
+        run: |
+          echo "Uploading zips to S3 bucket: $DEPLOY_BUCKET"
+          aws s3 sync build/ s3://$DEPLOY_BUCKET/ --delete
+          echo "✅ Upload complete"
+
+      # Step 8 (optional): Run unit tests before deploy
+      # Uncomment if you add tests in future
+      #
+      # - name: 🧪 Run unit tests
+      #   run: |
+      #     pytest --maxfail=1 --disable-warnings -q
+
+      # Step 9: Deploy or update CloudFormation stack
+      - name: 🧪 Debug environment
+        run: |
+          echo "DEPLOY_BUCKET is set to: $DEPLOY_BUCKET"
+          echo "ALERT_EMAIL is set to: $ALERT_EMAIL"
+        # env:
+        #   ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
+      - name: 🧹 Delete existing stack if ROLLBACK_COMPLETE
+        run: |
+          status=$(aws cloudformation describe-stacks --stack-name smart-expense-tracker --query "Stacks[0].StackStatus" --output text || echo "NOT_FOUND")
+          if [ "$status" = "ROLLBACK_COMPLETE" ]; then
+            echo "Deleting old stack in ROLLBACK_COMPLETE state..."
+            aws cloudformation delete-stack --stack-name smart-expense-tracker
+            aws cloudformation wait stack-delete-complete --stack-name smart-expense-tracker
+          else
+            echo "No rollback stack found, continuing..."
+          fi
+      # - name: 📦 Upload Lambda packages to S3
+      #   run: |
+      #     aws s3 cp lambda/add_expense.zip s3://$DEPLOY_BUCKET/add_expense.zip
+      #     aws s3 cp lambda/get_expenses.zip s3://$DEPLOY_BUCKET/get_expenses.zip
+      #     aws s3 cp lambda/delete_expense.zip s3://$DEPLOY_BUCKET/delete_expense.zip
+      #     aws s3 cp lambda/presign_upload.zip s3://$DEPLOY_BUCKET/presign_upload.zip
+      - name: 🚀 Deploy CloudFormation stack
+        run: |
+          aws cloudformation deploy \
+            --template-file Infra/SMT.yaml \
+            --stack-name smart-expense-tracker \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --parameter-overrides \
+              DeploymentS3Bucket=$DEPLOY_BUCKET \
+              LambdaRuntime=python3.12 \
+              AllowedEmailForAlerts=a4@gmail.com
+          
+      # - name: ✅ Verify Lambda packages uploaded successfully
+      #   run: |
+      #     echo "Checking if Lambda ZIPs exist in $DEPLOY_BUCKET ..."
+      #     aws s3 ls s3://$DEPLOY_BUCKET/add_expense.zip || { echo "❌ add_expense.zip not found!"; exit 1; }
+      #     aws s3 ls s3://$DEPLOY_BUCKET/get_expenses.zip || { echo "❌ get_expenses.zip not found!"; exit 1; }
+      #     aws s3 ls s3://$DEPLOY_BUCKET/delete_expense.zip || { echo "❌ delete_expense.zip not found!"; exit 1; }
+      #     aws s3 ls s3://$DEPLOY_BUCKET/presign_upload.zip || { echo "❌ presign_upload.zip not found!"; exit 1; }
+      #     echo "✅ All Lambda ZIPs verified in S3!"
+
+      # - name: 🩺 Diagnose CloudFormation failure
+      #   if: failure()              # ✅ only runs if the deploy step failed
+      #   run: |
+      #     echo "Fetching CloudFormation events..."
+      #     aws cloudformation describe-stack-events \
+      #       --stack-name smart-expense-tracker \
+      #       --max-items 20
+
+      - name: ✅ Verify stack status
+        if: always()               # ✅ runs regardless of success or failure
+        run: |
+          aws cloudformation describe-stacks \
+            --stack-name smart-expense-tracker \
+            --query "Stacks[0].StackStatus" --output text
