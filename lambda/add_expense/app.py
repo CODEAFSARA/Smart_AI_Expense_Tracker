@@ -9,7 +9,7 @@ dynamodb = boto3.resource('dynamodb')
 table_name = os.environ.get('TABLE_NAME')
 table = dynamodb.Table(table_name)
 
-HF_MODEL_URL = "https://api-inference.huggingface.co/models/facebook/bart-large-mnli"
+HF_MODEL_URL = "https://router.huggingface.co/hf-inference/models/facebook/bart-large-mnli"
 HF_TOKEN = os.environ.get('HF_TOKEN')
 
 def categorize_expense(description):
