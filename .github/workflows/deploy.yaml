@@ -100,10 +100,25 @@ jobs:
       #     aws s3 cp lambda/get_expenses.zip s3://$DEPLOY_BUCKET/get_expenses.zip
       #     aws s3 cp lambda/delete_expense.zip s3://$DEPLOY_BUCKET/delete_expense.zip
       #     aws s3 cp lambda/presign_upload.zip s3://$DEPLOY_BUCKET/presign_upload.zip
+      # - name: 🚀 Deploy CloudFormation stack
+      #   env:
+      #     HF_KEY: ${{ secrets.HF_KEY }}
+      #   run: |
+      #     aws cloudformation deploy \
+      #       --template-file Infra/SMT.yaml \
+      #       --stack-name smart-expense-tracker \
+      #       --capabilities CAPABILITY_NAMED_IAM \
+      #       --parameter-overrides \
+      #         DeploymentS3Bucket=$DEPLOY_BUCKET \
+      #         LambdaRuntime=python3.12 \
+      #         AllowedEmailForAlerts=a4@gmail.com
+      #         HfToken=$HF_KEY
       - name: 🚀 Deploy CloudFormation stack
         env:
-          HF_KEY: ${{ secrets.HF_KEY }}
+          DEPLOY_BUCKET: ${{ env.DEPLOY_BUCKET }}
+          HF_TOKEN: ${{ secrets.HF_KEY }}
         run: |
+          echo "🧠 Debug: HF_TOKEN length is ${#HF_TOKEN}"
           aws cloudformation deploy \
             --template-file Infra/SMT.yaml \
             --stack-name smart-expense-tracker \
@@ -111,9 +126,10 @@ jobs:
             --parameter-overrides \
               DeploymentS3Bucket=$DEPLOY_BUCKET \
               LambdaRuntime=python3.12 \
-              AllowedEmailForAlerts=a4@gmail.com
-              HfToken=$HF_KEY
-      #
+              AllowedEmailForAlerts=a4@gmail.com \
+              HfToken=$HF_TOKEN
+
+
       # - name: ✅ Verify Lambda packages uploaded successfully
       #   run: |
       #     echo "Checking if Lambda ZIPs exist in $DEPLOY_BUCKET ..."

@@ -132,8 +132,9 @@ Resources:
       Runtime: !Ref LambdaRuntime
       Role: !GetAtt ExpenseTrackerLambdaRole.Arn
       Environment:
-      Variables:
-        HF_TOKEN: !Ref HfToken
+        Variables:
+          HF_TOKEN: !Ref HfToken
+
       Code:
         S3Bucket: !Ref DeploymentS3Bucket
         S3Key: categorize_expense.zip
