@@ -127,7 +127,7 @@ Resources:
       FunctionName: !Sub "${AWS::StackName}-categorize-expense"
       Handler: app.lambda_handler
       Runtime: !Ref LambdaRuntime
-      Role: !GetAtt LambdaExecutionRole.Arn
+      Role: !GetAtt ExpenseTrackerLambdaRole.Arn
       Environment:
         Variables:
           HF_TOKEN: "{{resolve:secretsmanager:HF_TOKEN:SecretString}}"
