@@ -18,6 +18,7 @@ def categorize_expense(description):
         "Authorization": f"Bearer {HF_TOKEN}",
         "Content-Type": "application/json"
     }
+    #
     payload = {
         "inputs": description,
         "parameters": {
