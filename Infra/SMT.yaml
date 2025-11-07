@@ -201,24 +201,25 @@ Resources:
           - arn:aws:apigateway:${Region}:lambda:path/2015-03-31/functions/${LambdaArn}/invocations
           - { Region: !Ref "AWS::Region", LambdaArn: !GetAtt AddExpenseFunction.Arn }
   ApiMethodPostCategorize:
-  Type: AWS::ApiGateway::Method
-  Properties:
-    RestApiId: !Ref ApiGatewayRestApi
-    ResourceId: !Ref ApiResourceCategorize
-    HttpMethod: POST
-    AuthorizationType: NONE
-    Integration:
-      Type: AWS_PROXY
-      IntegrationHttpMethod: POST
-      Uri: !Sub
-        - arn:aws:apigateway:${Region}:lambda:path/2015-03-31/functions/${LambdaArn}/invocations
-        - { Region: !Ref "AWS::Region", LambdaArn: !GetAtt CategorizeExpenseFunction.Arn }
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ResourceId: !Ref ApiResourceCategorize
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub
+          - arn:aws:apigateway:${Region}:lambda:path/2015-03-31/functions/${LambdaArn}/invocations
+          - { Region: !Ref "AWS::Region", LambdaArn: !GetAtt CategorizeExpenseFunction.Arn }
+          
   ApiResourceCategorize:
-  Type: AWS::ApiGateway::Resource
-  Properties:
-    ParentId: !GetAtt ApiGatewayRestApi.RootResourceId
-    PathPart: categorize
-    RestApiId: !Ref ApiGatewayRestApi
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      ParentId: !GetAtt ApiGatewayRestApi.RootResourceId
+      PathPart: categorize
+      RestApiId: !Ref ApiGatewayRestApi
 
   ApiMethodGet:
     Type: AWS::ApiGateway::Method
