@@ -132,13 +132,11 @@ Resources:
       Runtime: !Ref LambdaRuntime
       Role: !GetAtt ExpenseTrackerLambdaRole.Arn
       Environment:
-        Variables:
+      Variables:
         HF_TOKEN: !Ref HfToken
-
       Code:
         S3Bucket: !Ref DeploymentS3Bucket
         S3Key: categorize_expense.zip
-
 
   DeleteExpenseFunction:
     Type: AWS::Lambda::Function

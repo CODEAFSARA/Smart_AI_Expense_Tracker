@@ -101,6 +101,8 @@ jobs:
       #     aws s3 cp lambda/delete_expense.zip s3://$DEPLOY_BUCKET/delete_expense.zip
       #     aws s3 cp lambda/presign_upload.zip s3://$DEPLOY_BUCKET/presign_upload.zip
       - name: 🚀 Deploy CloudFormation stack
+        env:
+          HF_KEY: ${{ secrets.HF_KEY }}
         run: |
           aws cloudformation deploy \
             --template-file Infra/SMT.yaml \
@@ -110,7 +112,7 @@ jobs:
               DeploymentS3Bucket=$DEPLOY_BUCKET \
               LambdaRuntime=python3.12 \
               AllowedEmailForAlerts=a4@gmail.com
-              HfToken=${{ secrets.HF_KEY }}
+              HfToken=$HF_KEY
       #
       # - name: ✅ Verify Lambda packages uploaded successfully
       #   run: |
