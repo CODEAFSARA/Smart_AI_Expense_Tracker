@@ -213,7 +213,7 @@ Resources:
         Uri: !Sub
           - arn:aws:apigateway:${Region}:lambda:path/2015-03-31/functions/${LambdaArn}/invocations
           - { Region: !Ref "AWS::Region", LambdaArn: !GetAtt CategorizeExpenseFunction.Arn }
-          
+
   ApiResourceCategorize:
     Type: AWS::ApiGateway::Resource
     Properties:
@@ -320,12 +320,12 @@ Resources:
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/*/presign"
   PermissionForApiToInvokeCategorizeLambda:
-  Type: AWS::Lambda::Permission
-  Properties:
-    FunctionName: !GetAtt CategorizeExpenseFunction.Arn
-    Action: lambda:InvokeFunction
-    Principal: apigateway.amazonaws.com
-    SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/*/categorize"
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt CategorizeExpenseFunction.Arn
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/*/categorize"
 
   AlarmTopic:
     Type: AWS::SNS::Topic
