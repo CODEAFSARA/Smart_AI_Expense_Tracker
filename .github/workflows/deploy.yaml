@@ -111,7 +111,7 @@ jobs:
               LambdaRuntime=python3.12 \
               AllowedEmailForAlerts=a4@gmail.com
               HfToken=${{ secrets.HF_KEY }}
-          
+      #
       # - name: ✅ Verify Lambda packages uploaded successfully
       #   run: |
       #     echo "Checking if Lambda ZIPs exist in $DEPLOY_BUCKET ..."
