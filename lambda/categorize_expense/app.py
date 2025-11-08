@@ -70,7 +70,7 @@ def categorize_expense(description):
             "candidate_labels": ["Food", "Travel", "Shopping", "Bills", "Entertainment", "Health", "Other"]
         }
     }
-
+#
     response = requests.post(HF_MODEL_URL, headers=headers, json=payload)
     print("🔍 Status code:", response.status_code)
     print("🔍 Raw response text:", response.text[:400])
