@@ -140,7 +140,7 @@ def handler(event, context):
     """
     try:
         body = json.loads(event.get('body') or "{}")
-
+#
         # Validate required fields
         if not all(k in body for k in ['userId', 'amount', 'description']):
             return {"statusCode": 400, "body": json.dumps({"error": "Missing required fields"})}
