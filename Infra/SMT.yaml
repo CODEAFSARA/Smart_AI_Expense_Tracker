@@ -107,6 +107,7 @@ Resources:
         Variables:
           TABLE_NAME: !Ref ExpenseTrackerTable
           BUCKET_NAME: !Ref RecipientsBucket
+          HF_TOKEN: !Ref HfToken
 
   GetExpensesFunction:
     Type: AWS::Lambda::Function
