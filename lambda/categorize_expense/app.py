@@ -71,6 +71,7 @@ def categorize_expense(description):
         }
     }
 #
+#
     response = requests.post(HF_MODEL_URL, headers=headers, json=payload)
     print("🔍 Status code:", response.status_code)
     print("🔍 Raw response text:", response.text[:400])
