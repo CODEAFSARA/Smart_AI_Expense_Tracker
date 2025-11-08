@@ -51,7 +51,7 @@ import os
 import json
 import requests
 
-HF_TOKEN = os.environ.get("HF_TOKEN") or "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"
+HF_TOKEN = os.environ.get("HF_TOKEN")
 HF_MODEL_URL = "https://router.huggingface.co/hf-inference/models/facebook/bart-large-mnli"
 
 def categorize_expense(description):
