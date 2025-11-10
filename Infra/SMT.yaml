@@ -236,27 +236,50 @@ Resources:
           - arn:aws:apigateway:${Region}:lambda:path/2015-03-31/functions/${LambdaArn}/invocations
           - { Region: !Ref "AWS::Region", LambdaArn: !GetAtt GetExpensesFunction.Arn }
 
-  ApiResourceExpenseId:
+  # ApiResourceExpenseId:
+  #   Type: AWS::ApiGateway::Resource
+  #   Properties:
+  #     RestApiId: !Ref ApiGatewayRestApi
+  #     ParentId: !Ref ApiResourceExpenses
+  #     PathPart: "{expenseId}"
+  ApiResourceUserId:
     Type: AWS::ApiGateway::Resource
     Properties:
       RestApiId: !Ref ApiGatewayRestApi
       ParentId: !Ref ApiResourceExpenses
-      PathPart: "{expenseId}"
+      PathPart: "{userId}"
 
-  ApiMethodDelete:
+  ApiResourceExpenseDate:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ParentId: !Ref ApiResourceUserId
+      PathPart: "{expenseDate}"
+
+  # ApiMethodDelete:
+  #   Type: AWS::ApiGateway::Method
+  #   Properties:
+  #     RestApiId: !Ref ApiGatewayRestApi
+  #     ResourceId: !Ref ApiResourceExpenseId
+  #     HttpMethod: DELETE
+  #     AuthorizationType: NONE
+  #     Integration:
+  #       Type: AWS_PROXY
+  #       IntegrationHttpMethod: POST
+  #       Uri: !Sub
+  #         - arn:aws:apigateway:${Region}:lambda:path/2015-03-31/functions/${LambdaArn}/invocations
+  #         - { Region: !Ref "AWS::Region", LambdaArn: !GetAtt DeleteExpenseFunction.Arn }
+  ApiMethodDeleteExpense:
     Type: AWS::ApiGateway::Method
     Properties:
       RestApiId: !Ref ApiGatewayRestApi
-      ResourceId: !Ref ApiResourceExpenseId
+      ResourceId: !Ref ApiResourceExpenseDate
       HttpMethod: DELETE
       AuthorizationType: NONE
       Integration:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
-        Uri: !Sub
-          - arn:aws:apigateway:${Region}:lambda:path/2015-03-31/functions/${LambdaArn}/invocations
-          - { Region: !Ref "AWS::Region", LambdaArn: !GetAtt DeleteExpenseFunction.Arn }
-
+        Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${DeleteExpenseFunction.Arn}/invocations
   ApiResourcePresign:
     Type: AWS::ApiGateway::Resource
     Properties:
@@ -283,7 +306,7 @@ Resources:
     DependsOn:
       - ApiMethodPostAdd
       - ApiMethodGet
-      - ApiMethodDelete
+      - ApiMethodDeleteExpense
       - ApiMethodPresignPost
     Properties:
       RestApiId: !Ref ApiGatewayRestApi
@@ -311,7 +334,7 @@ Resources:
       FunctionName: !GetAtt DeleteExpenseFunction.Arn
       Action: lambda:InvokeFunction
       Principal: apigateway.amazonaws.com
-      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/*/expenses/*"
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/DELETE/expenses/*/*"
 
   PermissionForApiToInvokePresignLambda:
     Type: AWS::Lambda::Permission
