@@ -2,38 +2,18 @@
 # import json
 # import uuid
 # import boto3
-# import requests
 # from datetime import datetime
 
+# # Initialize AWS resources
 # dynamodb = boto3.resource('dynamodb')
-# table_name = os.environ.get('TABLE_NAME')
+# lambda_client = boto3.client('lambda')
+
+# table_name = "ExpenseTrackerTable"
 # table = dynamodb.Table(table_name)
-
-# HF_MODEL_URL = "https://router.huggingface.co/hf-inference/models/facebook/bart-large-mnli"
-# HF_TOKEN = os.environ.get('HF_TOKEN')
-
-# def categorize_expense(description):
-#     """Use Hugging Face API to predict expense category"""
-#     headers = {
-#         "Authorization": f"Bearer {HF_TOKEN}",
-#         "Content-Type": "application/json"
-#     }
-#     #
-#     payload = {
-#         "inputs": description,
-#         "parameters": {
-#             "candidate_labels": ["Food", "Travel", "Shopping", "Bills", "Entertainment", "Health", "Other"]
-#         }
-#     }
-
-#     response = requests.post(HF_MODEL_URL, headers=headers, json=payload)
-#     response.raise_for_status()
-#     data = response.json()
-#     return data.get("labels", ["Uncategorized"])[0]
 
 # def handler(event, context):
 #     """
-#     Smart Expense Tracker — AI Categorization
+#     Smart Expense Tracker — Add Expense Lambda
 #     Expected POST JSON body:
 #     {
 #       "userId": "user123",
@@ -44,33 +24,56 @@
 #     }
 #     """
 #     try:
-#         body = json.loads(event.get('body') or "{}")
+#         print("🧾 Incoming event:", event)
+
+#         # Parse JSON body (handle string or dict)
+#         body = event.get("body")
+#         if isinstance(body, str):
+#             body = json.loads(body)
+#         elif isinstance(body, dict):
+#             body = body
+#         else:
+#             raise ValueError("Invalid body format")
+
+#         print("📦 Parsed body:", body)
 
 #         # Validate required fields
-#         if not all(k in body for k in ['userId', 'amount', 'description']):
+#         required_fields = ["userId", "amount", "description"]
+#         if not all(field in body for field in required_fields):
 #             return {"statusCode": 400, "body": json.dumps({"error": "Missing required fields"})}
 
 #         expense_id = str(uuid.uuid4())
-#         date = body.get('date') or datetime.utcnow().strftime("%Y-%m-%d")
+#         date = body.get("date") or datetime.utcnow().strftime("%Y-%m-%d")
 
-#         # 🧠 AI categorization
-#         category = categorize_expense(body['description'])
+#         # 🧠 Invoke categorize_expense Lambda
+#      # 🧠 Mock AI categorization locally (for testing)
+#         description = body["description"].lower()
 
-#         # Prepare item
+#         if any(word in description for word in ["food", "lunch", "dinner", "restaurant", "eat", "snack"]):
+#             category = "Food"
+#         elif any(word in description for word in ["bus", "train", "flight", "travel", "uber"]):
+#             category = "Travel"
+#         elif any(word in description for word in ["bill", "electricity", "rent", "internet"]):
+#             category = "Bills"
+#         else:
+#             category = "Other"
+
+#         # Prepare DynamoDB item
 #         item = {
-#             'expenseId': expense_id,
-#             'userId': body['userId'],
-#             'amount': str(body['amount']),
-#             'category': category,
-#             'date': date,
-#             'description': body['description']
+#             "expenseId": expense_id,
+#             "userId": body["userId"],
+#             "amount": str(body["amount"]),
+#             "category": category,
+#             "date": date,
+#             "description": body["description"]
 #         }
 
-#         if 'receiptKey' in body:
-#             item['receiptKey'] = body['receiptKey']
+#         if "receiptKey" in body:
+#             item["receiptKey"] = body["receiptKey"]
 
-#         # Store in DynamoDB
-#         table.put_item(Item=item)
+#         # Save to DynamoDB
+#         print("🗄️ Mock save to DynamoDB:", item)
+#         print("💾 Saved to DynamoDB")
 
 #         return {
 #             "statusCode": 201,
@@ -82,54 +85,50 @@
 #         }
 
 #     except Exception as e:
-#         print("Error:", e)
+#         print("❌ Error:", e)
 #         return {"statusCode": 500, "body": json.dumps({"error": str(e)})}
+
+
+# # For local testing
+# if __name__ == "__main__":
+#     test_event = {
+#         "body": json.dumps({
+#             "userId": "user123",
+#             "amount": 250.0,
+#             "description": "Lunch at Subway",
+#             "date": "2025-11-07",
+#             "receiptKey": "optional-s3-key"
+#         })
+#     }
+
+#     # Set environment vars for local test
+#     os.environ["TABLE_NAME"] = "SmartExpenseTable"
+#     os.environ["CATEGORIZE_LAMBDA_NAME"] = "categorize_expense"
+
+#     print("\n✅ Lambda result:", handler(test_event, None))
 import os
 import json
 import uuid
 import boto3
-import requests
 from datetime import datetime
 
-# Initialize AWS DynamoDB
+# --- Initialize AWS Resources ---
 dynamodb = boto3.resource('dynamodb')
-table_name = os.environ.get('TABLE_NAME')
-table = dynamodb.Table(table_name)
+lambda_client = boto3.client('lambda')
 
-# Hugging Face model and token
-HF_MODEL_URL = "https://router.huggingface.co/hf-inference/models/facebook/bart-large-mnli"
-HF_TOKEN = os.environ.get('HF_TOKEN')
+# Use environment variable for flexibility
+TABLE_NAME = os.environ.get("TABLE_NAME")
+if not TABLE_NAME:
+    raise ValueError("❌ Environment variable TABLE_NAME is missing")
 
-def categorize_expense(description):
-    """Use Hugging Face API (new router) to predict expense category"""
-    if not HF_TOKEN:
-        raise ValueError("HF_TOKEN is missing from environment variables")
-
-    headers = {
-        "Authorization": f"Bearer {HF_TOKEN}",
-        "Content-Type": "application/json"
-    }
-
-    payload = {
-        "inputs": description,
-        "parameters": {
-            "candidate_labels": ["Food", "Travel", "Shopping", "Bills", "Entertainment", "Health", "Other"]
-        }
-    }
-
-    response = requests.post(HF_MODEL_URL, headers=headers, json=payload)
-    if response.status_code != 200:
-        raise Exception(f"Hugging Face API error: {response.status_code} - {response.text}")
-
-    data = response.json()
-    # Extract the best predicted label
-    return data.get("labels", ["Uncategorized"])[0]
+table = dynamodb.Table(TABLE_NAME)
 
 
 def handler(event, context):
     """
-    Smart Expense Tracker — AI Categorization
-    Expected POST JSON body:
+    Smart Expense Tracker — Add Expense Lambda
+    Triggered via API Gateway (POST)
+    Expected JSON body:
     {
       "userId": "user123",
       "amount": 250.0,
@@ -139,36 +138,61 @@ def handler(event, context):
     }
     """
     try:
-        body = json.loads(event.get('body') or "{}")
-#
+        print("🧾 Incoming event:", json.dumps(event))
+
+        # Parse JSON body
+        body = event.get("body")
+        if isinstance(body, str):
+            body = json.loads(body)
+        elif not isinstance(body, dict):
+            raise ValueError("Invalid body format")
+
+        print("📦 Parsed body:", body)
+
         # Validate required fields
-        if not all(k in body for k in ['userId', 'amount', 'description']):
-            return {"statusCode": 400, "body": json.dumps({"error": "Missing required fields"})}
+        required_fields = ["userId", "amount", "description"]
+        if not all(field in body for field in required_fields):
+            return {
+                "statusCode": 400,
+                "body": json.dumps({"error": "Missing required fields"})
+            }
 
+        # Generate IDs and defaults
         expense_id = str(uuid.uuid4())
-        date = body.get('date') or datetime.utcnow().strftime("%Y-%m-%d")
+        date = body.get("date") or datetime.utcnow().strftime("%Y-%m-%d")
 
-        # 🧠 AI categorization using Hugging Face
-        category = categorize_expense(body['description'])
+        # 🧠 Basic AI-like categorization (can later integrate real Hugging Face model)
+        description = body["description"].lower()
+        if any(word in description for word in ["food", "lunch", "dinner", "restaurant", "eat", "snack"]):
+            category = "Food"
+        elif any(word in description for word in ["bus", "train", "flight", "travel", "uber"]):
+            category = "Travel"
+        elif any(word in description for word in ["bill", "electricity", "rent", "internet"]):
+            category = "Bills"
+        else:
+            category = "Other"
 
-        # Prepare item for DynamoDB
+        # Prepare DynamoDB item
         item = {
-            'expenseId': expense_id,
-            'userId': body['userId'],
-            'amount': str(body['amount']),
-            'category': category,
-            'date': date,
-            'description': body['description']
+            "expenseId": expense_id,
+            "userId": body["userId"],
+            "amount": str(body["amount"]),
+            "category": category,
+            "date": date,
+            "description": body["description"],
         }
 
-        if 'receiptKey' in body:
-            item['receiptKey'] = body['receiptKey']
+        if "receiptKey" in body:
+            item["receiptKey"] = body["receiptKey"]
 
-        # Store in DynamoDB
+        # Save to DynamoDB
         table.put_item(Item=item)
+        print("💾 Saved to DynamoDB:", item)
 
+        # Return successful response
         return {
             "statusCode": 201,
+            "headers": {"Content-Type": "application/json"},
             "body": json.dumps({
                 "message": "Expense added successfully",
                 "predictedCategory": category,
@@ -177,5 +201,11 @@ def handler(event, context):
         }
 
     except Exception as e:
-        print("Error:", e)
-        return {"statusCode": 500, "body": json.dumps({"error": str(e)})}
+        print("❌ Error:", str(e))
+        return {
+            "statusCode": 500,
+            "headers": {"Content-Type": "application/json"},
+            "body": json.dumps({"error": str(e)})
+        }
+
+
