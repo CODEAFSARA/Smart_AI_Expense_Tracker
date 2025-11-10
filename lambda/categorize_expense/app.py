@@ -27,7 +27,7 @@ def categorize_expense(description):
         raise Exception(f"Hugging Face API error: {response.status_code} - {response.text}")
 
     data = response.json()
-
+#
     # ✅ Handle both dict or list response types
     if isinstance(data, list) and len(data) > 0 and "label" in data[0]:
         return data[0]["label"]  # e.g., "Food"
