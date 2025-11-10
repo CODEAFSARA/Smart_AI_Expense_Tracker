@@ -142,7 +142,7 @@ def handler(event, context):
     try:
         print("🧾 Incoming event:", json.dumps(event))
 
-        # --- Parse Body ---
+        # --- Parse Body ----
         body = event.get("body")
         if isinstance(body, str):
             body = json.loads(body)
