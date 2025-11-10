@@ -113,10 +113,10 @@ import boto3
 from datetime import datetime
 
 # --- Initialize AWS Resources ---
-dynamodb = boto3.resource('dynamodb')
-lambda_client = boto3.client('lambda')
+dynamodb = boto3.resource("dynamodb")
+lambda_client = boto3.client("lambda")
 
-# Use environment variable for flexibility
+# --- Environment Variables ---
 TABLE_NAME = os.environ.get("TABLE_NAME")
 if not TABLE_NAME:
     raise ValueError("❌ Environment variable TABLE_NAME is missing")
@@ -127,20 +127,22 @@ table = dynamodb.Table(TABLE_NAME)
 def handler(event, context):
     """
     Smart Expense Tracker — Add Expense Lambda
+
     Triggered via API Gateway (POST)
     Expected JSON body:
     {
       "userId": "user123",
       "amount": 250.0,
       "description": "Lunch at Subway",
-      "date": "2025-11-07",   # optional
+      "date": "2025-11-07",     # optional
       "receiptKey": "optional-s3-key"
     }
     """
+
     try:
         print("🧾 Incoming event:", json.dumps(event))
 
-        # Parse JSON body
+        # --- Parse Body ---
         body = event.get("body")
         if isinstance(body, str):
             body = json.loads(body)
@@ -149,47 +151,49 @@ def handler(event, context):
 
         print("📦 Parsed body:", body)
 
-        # Validate required fields
+        # --- Validate Required Fields ---
         required_fields = ["userId", "amount", "description"]
-        if not all(field in body for field in required_fields):
+        missing = [f for f in required_fields if f not in body]
+        if missing:
             return {
                 "statusCode": 400,
-                "body": json.dumps({"error": "Missing required fields"})
+                "headers": {"Content-Type": "application/json"},
+                "body": json.dumps({"error": f"Missing required fields: {', '.join(missing)}"})
             }
 
-        # Generate IDs and defaults
+        # --- Generate IDs and Defaults ---
         expense_id = str(uuid.uuid4())
-        date = body.get("date") or datetime.utcnow().strftime("%Y-%m-%d")
+        expense_date = body.get("date") or datetime.utcnow().strftime("%Y-%m-%d")
 
-        # 🧠 Basic AI-like categorization (can later integrate real Hugging Face model)
-        description = body["description"].lower()
-        if any(word in description for word in ["food", "lunch", "dinner", "restaurant", "eat", "snack"]):
+        # --- Categorization Logic (mock AI, can replace with HuggingFace later) ---
+        description_text = body["description"].lower()
+        if any(word in description_text for word in ["food", "lunch", "dinner", "restaurant", "eat", "snack"]):
             category = "Food"
-        elif any(word in description for word in ["bus", "train", "flight", "travel", "uber"]):
+        elif any(word in description_text for word in ["bus", "train", "flight", "travel", "uber", "taxi"]):
             category = "Travel"
-        elif any(word in description for word in ["bill", "electricity", "rent", "internet"]):
+        elif any(word in description_text for word in ["bill", "electricity", "rent", "internet", "wifi"]):
             category = "Bills"
         else:
             category = "Other"
 
-        # Prepare DynamoDB item
+        # --- Prepare DynamoDB Item (match schema exactly) ---
         item = {
-            "expenseId": expense_id,
-            "userId": body["userId"],
-            "amount": str(body["amount"]),
-            "category": category,
-            "date": date,
-            "description": body["description"],
+            "UserId": body["userId"],        # HASH key
+            "ExpenseDate": expense_date,     # RANGE key
+            "ExpenseId": expense_id,         # Unique identifier
+            "Amount": str(body["amount"]),
+            "Category": category,
+            "Description": body["description"]
         }
 
         if "receiptKey" in body:
-            item["receiptKey"] = body["receiptKey"]
+            item["ReceiptKey"] = body["receiptKey"]
 
-        # Save to DynamoDB
+        # --- Save to DynamoDB ---
         table.put_item(Item=item)
-        print("💾 Saved to DynamoDB:", item)
+        print("💾 Saved to DynamoDB:", json.dumps(item))
 
-        # Return successful response
+        # --- Return Success ---
         return {
             "statusCode": 201,
             "headers": {"Content-Type": "application/json"},
@@ -209,3 +213,19 @@ def handler(event, context):
         }
 
 
+# --- Local Testing Block ---
+if __name__ == "__main__":
+    os.environ["TABLE_NAME"] = "ExpenseTrackerTable"
+
+    test_event = {
+        "body": json.dumps({
+            "userId": "user123",
+            "amount": 250.0,
+            "description": "Lunch at Subway",
+            "date": "2025-11-07",
+            "receiptKey": "optional-s3-key"
+        })
+    }
+
+    result = handler(test_event, None)
+    print("\n✅ Test Result:", json.dumps(result, indent=2))
