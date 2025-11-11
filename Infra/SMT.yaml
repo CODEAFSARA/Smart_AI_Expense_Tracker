@@ -190,6 +190,8 @@ Resources:
       FunctionName: !Sub "${AWS::StackName}-categorize-expense"
       Handler: app.handler
       Runtime: !Ref LambdaRuntime
+      Timeout: 30
+      MemorySize: 512
       Role: !GetAtt ExpenseTrackerLambdaRole.Arn
       Environment:
         Variables:
