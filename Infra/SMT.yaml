@@ -108,6 +108,8 @@ Resources:
           TABLE_NAME: !Ref ExpenseTrackerTable
           BUCKET_NAME: !Ref RecipientsBucket
           HF_TOKEN: !Ref HfToken
+          CATEGORIZE_LAMBDA_NAME: !Ref CategorizeExpenseFunction
+
 
   GetExpensesFunction:
     Type: AWS::Lambda::Function
@@ -129,13 +131,13 @@ Resources:
     Type: AWS::Lambda::Function
     Properties:
       FunctionName: !Sub "${AWS::StackName}-categorize-expense"
-      Handler: app.lambda_handler
+      Handler: app.handler
       Runtime: !Ref LambdaRuntime
       Role: !GetAtt ExpenseTrackerLambdaRole.Arn
       Environment:
         Variables:
           HF_TOKEN: !Ref HfToken
-          Table_NAME: !Ref ExpenseTrackerTable
+          TABLE_NAME: !Ref ExpenseTrackerTable
 
       Code:
         S3Bucket: !Ref DeploymentS3Bucket
@@ -319,6 +321,14 @@ Resources:
       Action: lambda:InvokeFunction
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/*/expenses"
+
+  PermissionForAddToInvokeCategorize:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt CategorizeExpenseFunction.Arn
+      Action: lambda:InvokeFunction
+      Principal: lambda.amazonaws.com
+      SourceArn: !GetAtt AddExpenseFunction.Arn
 
   PermissionForApiToInvokeGetLambda:
     Type: AWS::Lambda::Permission
