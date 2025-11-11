@@ -84,8 +84,8 @@ Resources:
               - Effect: Allow
                 Action:
                   - lambda:InvokeFunction
-                Resource: !GetAtt CategorizeExpenseFunction.Arn
-
+                Resource: 
+                  - !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${AWS::StackName}-*"
         - PolicyName: ExpenseTrackerLambdaPolicy
           PolicyDocument:
             Version: "2012-10-17"
@@ -379,13 +379,21 @@ Resources:
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/*/*/expenses"
 
+  # PermissionForAddToInvokeCategorize:
+  #   Type: AWS::Lambda::Permission
+  #   Properties:
+  #     FunctionName: !GetAtt CategorizeExpenseFunction.Arn
+  #     Action: lambda:InvokeFunction
+  #     Principal: lambda.amazonaws.com
+  #     SourceArn: !GetAtt AddExpenseFunction.Arn
   PermissionForAddToInvokeCategorize:
     Type: AWS::Lambda::Permission
     Properties:
       FunctionName: !GetAtt CategorizeExpenseFunction.Arn
       Action: lambda:InvokeFunction
       Principal: lambda.amazonaws.com
-      SourceArn: !GetAtt AddExpenseFunction.Arn
+      SourceArn: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${AWS::StackName}-AddExpense"
+
 
   PermissionForApiToInvokeGetLambda:
     Type: AWS::Lambda::Permission
