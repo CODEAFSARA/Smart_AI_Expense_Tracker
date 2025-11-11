@@ -64,54 +64,54 @@ Resources:
   #                 - logs:PutLogEvents
   #               Resource: "*"
   ExpenseTrackerLambdaRole:
-  Type: AWS::IAM::Role
-  Properties:
-    RoleName: !Sub "${AWS::StackName}-LambdaRole"
-    AssumeRolePolicyDocument:
-      Version: "2012-10-17"
-      Statement:
-        - Effect: Allow
-          Principal:
-            Service:
-              - lambda.amazonaws.com
-          Action: sts:AssumeRole
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${AWS::StackName}-LambdaRole"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action: sts:AssumeRole
 
-    Policies:
-      - PolicyName: AllowInvokeCategorizeLambda
-        PolicyDocument:
-          Version: "2012-10-17"
-          Statement:
-            - Effect: Allow
-              Action:
-                - lambda:InvokeFunction
-              Resource: !GetAtt CategorizeExpenseFunction.Arn
+      Policies:
+        - PolicyName: AllowInvokeCategorizeLambda
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - lambda:InvokeFunction
+                Resource: !GetAtt CategorizeExpenseFunction.Arn
 
-      - PolicyName: ExpenseTrackerLambdaPolicy
-        PolicyDocument:
-          Version: "2012-10-17"
-          Statement:
-            - Effect: Allow
-              Action:
-                - dynamodb:PutItem
-                - dynamodb:GetItem
-                - dynamodb:Query
-                - dynamodb:Scan
-                - dynamodb:DeleteItem
-              Resource: !GetAtt ExpenseTrackerTable.Arn
+        - PolicyName: ExpenseTrackerLambdaPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                  - dynamodb:GetItem
+                  - dynamodb:Query
+                  - dynamodb:Scan
+                  - dynamodb:DeleteItem
+                Resource: !GetAtt ExpenseTrackerTable.Arn
 
-            - Effect: Allow
-              Action:
-                - s3:GetObject
-                - s3:PutObject
-                - s3:DeleteObject
-              Resource: !Sub "arn:aws:s3:::${RecipientsBucket}/*"
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:DeleteObject
+                Resource: !Sub "arn:aws:s3:::${RecipientsBucket}/*"
 
-            - Effect: Allow
-              Action:
-                - logs:CreateLogGroup
-                - logs:CreateLogStream
-                - logs:PutLogEvents
-              Resource: "*"
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: "*"
 
   ExpenseTrackerTable:
     Type: AWS::DynamoDB::Table
